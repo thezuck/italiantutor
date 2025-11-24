@@ -19,6 +19,13 @@ const apiRequest = async (endpoint, options = {}) => {
   const token = getToken();
   const url = `${API_BASE_URL}${endpoint}`;
 
+  console.log('[DEBUG] API Request:', {
+    method: options.method || 'GET',
+    url,
+    hasToken: !!token,
+    body: options.body
+  });
+
   const config = {
     ...options,
     headers: {
@@ -28,14 +35,28 @@ const apiRequest = async (endpoint, options = {}) => {
     },
   };
 
-  const response = await fetch(url, config);
+  try {
+    const response = await fetch(url, config);
+    console.log('[DEBUG] API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: response.url
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      console.error('[DEBUG] API Error Response:', error);
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[DEBUG] API Response data:', data);
+    return data;
+  } catch (error) {
+    console.error('[DEBUG] API Request failed:', error);
+    throw error;
   }
-
-  return response.json();
 };
 
 // Auth API
@@ -84,16 +105,24 @@ export const lessons = {
 // Chat Messages API
 export const chatMessages = {
   list: async (filters = {}, sortBy = 'created_date', limit = 100) => {
+    console.log('[DEBUG] API: chatMessages.list called with:', { filters, sortBy, limit });
     const params = new URLSearchParams({ sortBy, limit: limit.toString() });
     if (filters.user_email) params.append('user_email', filters.user_email);
     if (filters.lesson_id) params.append('lesson_id', filters.lesson_id);
-    return apiRequest(`/chat-messages?${params.toString()}`);
+    const url = `/chat-messages?${params.toString()}`;
+    console.log('[DEBUG] API: Requesting URL:', url);
+    const result = await apiRequest(url);
+    console.log('[DEBUG] API: chatMessages.list response:', result);
+    return result;
   },
   create: async (data) => {
-    return apiRequest('/chat-messages', {
+    console.log('[DEBUG] API: chatMessages.create called with:', data);
+    const result = await apiRequest('/chat-messages', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    console.log('[DEBUG] API: chatMessages.create response:', result);
+    return result;
   },
 };
 

@@ -1,7 +1,30 @@
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
-// Load environment variables from .env file
-dotenv.config();
+// Get the directory of this file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables from .env file in the backend directory
+const envPath = join(__dirname, '../.env');
+console.log('[DEBUG] Looking for .env file at:', envPath);
+console.log('[DEBUG] .env file exists:', existsSync(envPath));
+
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+  console.warn('[DEBUG] Error loading .env file:', result.error);
+} else {
+  console.log('[DEBUG] .env file loaded successfully');
+}
+
+console.log('[DEBUG] Environment variables loaded:');
+console.log('[DEBUG] OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
+console.log('[DEBUG] OPENAI_API_KEY length:', process.env.OPENAI_API_KEY?.length || 0);
+console.log('[DEBUG] OPENAI_API_KEY preview:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 10) + '...' : 'not set');
+console.log('[DEBUG] process.env.OPENAI_MODEL (raw):', process.env.OPENAI_MODEL);
+console.log('[DEBUG] process.env.OPENAI_MODEL type:', typeof process.env.OPENAI_MODEL);
 
 // Validate required environment variables
 const requiredEnvVars = ['JWT_SECRET'];
@@ -38,7 +61,15 @@ export const env = {
   
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  
+  // OpenAI
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_MODEL: process.env.OPENAI_MODEL,
 };
+
+console.log('[DEBUG] Exported env.OPENAI_API_KEY exists:', !!env.OPENAI_API_KEY);
+console.log('[DEBUG] Exported env.OPENAI_API_KEY length:', env.OPENAI_API_KEY?.length || 0);
+console.log('[DEBUG] Exported env.OPENAI_MODEL:', env.OPENAI_MODEL);
 
 // Validate JWT_SECRET in production
 if (env.NODE_ENV === 'production' && (!env.JWT_SECRET || env.JWT_SECRET === 'dev-secret-change-in-production')) {

@@ -7,33 +7,49 @@ import { motion } from "framer-motion";
 import { Bot, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Fake AI responses for demo
-const fakeResponses = [
-  "Ciao! Great question! Let me help you with that. In Italian, we often use...",
-  "Bene! That's correct! You're making great progress. Let's practice more...",
-  "Ottimo lavoro! That's a good attempt. The correct pronunciation is...",
-  "Perfetto! Now let's try something a bit more challenging...",
-  "Fantastico! You're really getting the hang of it. Remember that...",
-  "Molto bene! Italian grammar can be tricky, but you're doing well. Here's a tip..."
-];
-
 export default function Chat() {
   const { user } = useAuth();
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const queryClient = useQueryClient();
 
-  const { data: messages, isLoading } = useQuery({
+  console.log('[DEBUG] Chat component rendered, user:', user?.email);
+
+  const { data: messages, isLoading, error: queryError } = useQuery({
     queryKey: ["chatMessages", user?.email],
-    queryFn: () => ChatMessage.filter({ user_email: user?.email }, "created_date", 100),
+    queryFn: () => {
+      console.log('[DEBUG] Fetching chat messages for user:', user?.email);
+      return ChatMessage.filter({ user_email: user?.email }, "created_date", 100);
+    },
     enabled: !!user?.email,
-    initialData: []
+    initialData: [],
+    onSuccess: (data) => {
+      console.log('[DEBUG] Chat messages fetched successfully, count:', data?.length || 0);
+    },
+    onError: (error) => {
+      console.error('[DEBUG] Error fetching chat messages:', error);
+    }
+  });
+
+  console.log('[DEBUG] Query state:', { 
+    isLoading, 
+    messagesCount: messages?.length || 0, 
+    hasError: !!queryError,
+    userEmail: user?.email 
   });
 
   const createMessageMutation = useMutation({
-    mutationFn: (messageData) => ChatMessage.create(messageData),
-    onSuccess: () => {
+    mutationFn: (messageData) => {
+      console.log('[DEBUG] Creating message:', messageData);
+      return ChatMessage.create(messageData);
+    },
+    onSuccess: (data) => {
+      console.log('[DEBUG] Message created successfully:', data);
+      console.log('[DEBUG] Invalidating chat messages query...');
       queryClient.invalidateQueries({ queryKey: ["chatMessages"] });
+    },
+    onError: (error) => {
+      console.error('[DEBUG] Error creating message:', error);
     }
   });
 
@@ -46,30 +62,45 @@ export default function Chat() {
   }, [messages, isTyping]);
 
   const handleSendMessage = async (message) => {
-    if (!user) return;
-
-    // Create user message
-    await createMessageMutation.mutateAsync({
-      user_email: user.email,
-      message: message,
-      role: "user"
-    });
-
-    // Simulate AI typing
-    setIsTyping(true);
+    console.log('[DEBUG] handleSendMessage called with:', message);
     
-    // Fake delay for AI response
-    setTimeout(async () => {
-      const randomResponse = fakeResponses[Math.floor(Math.random() * fakeResponses.length)];
-      
-      await createMessageMutation.mutateAsync({
+    if (!user) {
+      console.warn('[DEBUG] No user found, cannot send message');
+      return;
+    }
+
+    console.log('[DEBUG] Setting typing indicator to true');
+    // Show typing indicator
+    setIsTyping(true);
+
+    try {
+      console.log('[DEBUG] Sending message to backend...');
+      // Create user message - backend will automatically generate AI response
+      const response = await createMessageMutation.mutateAsync({
         user_email: user.email,
-        message: randomResponse,
-        role: "tutor"
+        message: message,
+        role: "user"
       });
-      
+
+      console.log('[DEBUG] Backend response received:', response);
+      console.log('[DEBUG] Response has userMessage:', !!response.userMessage);
+      console.log('[DEBUG] Response has tutorMessage:', !!response.tutorMessage);
+      console.log('[DEBUG] Response has error:', !!response.error);
+
+      // Response may contain both userMessage and tutorMessage
+      // or just userMessage if AI response failed
+      // The mutation will automatically invalidate queries and refetch
+    } catch (error) {
+      console.error('[DEBUG] Error sending message:', error);
+      console.error('[DEBUG] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response
+      });
+    } finally {
+      console.log('[DEBUG] Setting typing indicator to false');
       setIsTyping(false);
-    }, 1500 + Math.random() * 1000);
+    }
   };
 
   return (
